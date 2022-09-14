@@ -1,5 +1,5 @@
 [package]
-name = "cw721-metadata-onchain"
+name = "cw721-metadata-onchain-custom"
 version = "0.13.4"
 authors = [
   "Ethan Frey <ethanfrey@users.noreply.github.com>",

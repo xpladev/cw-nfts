@@ -58,6 +58,21 @@ pub enum ExecuteMsg<T, E> {
 
     /// Extension msg
     Extension { msg: E },
+
+    /// nft minter update
+    UpdateMinter { new_minter: String },
+
+    /// Upgrade or combine to create a new nft
+    BurnMint{
+        burn_token: BurnTokenInfo<T>,
+        mint: Option<MintMsg<T>>,
+    },
+
+    /// Multi Send Nfts
+    MultiSendNft{
+        contract: String,
+        nft_info: Vec<SendNftsInfo>,
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -156,4 +171,17 @@ pub enum QueryMsg<Q> {
 #[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, Debug)]
 pub struct MinterResponse {
     pub minter: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct BurnTokenInfo<T> {
+    pub burn_token_owner: String,
+    pub burn_token_id: String,
+    pub changed_mint: Option<MintMsg<T>>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct SendNftsInfo {
+    pub token_id: String,
+    pub msg: Binary,
 }

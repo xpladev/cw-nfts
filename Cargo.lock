@@ -287,7 +287,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw721-metadata-onchain"
+name = "cw721-metadata-onchain-custom"
 version = "0.13.4"
 dependencies = [
  "cosmwasm-schema",
