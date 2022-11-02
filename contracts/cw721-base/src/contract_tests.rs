@@ -11,6 +11,8 @@ use crate::{
     ContractError, Cw721Contract, ExecuteMsg, Extension, InstantiateMsg, MintMsg, QueryMsg,
 };
 
+use crate::msg::{SendNftsInfo, TransferNftsInfo};
+
 const MINTER: &str = "merlin";
 const CONTRACT_NAME: &str = "Magic Power";
 const SYMBOL: &str = "MGK";
@@ -312,6 +314,153 @@ fn sending_nft() {
             .add_attribute("recipient", "another_contract")
             .add_attribute("token_id", token_id)
     );
+}
+
+#[test]
+fn update_minter() {
+    let mut deps = mock_dependencies();
+    let contract = setup_contract(deps.as_mut());
+
+    //other cannot update minter
+    let msg = ExecuteMsg::UpdateMinter {
+        new_minter: "new_minter".to_string(),
+    };
+
+    let other_info = mock_info("not the minter", &[]);
+    let env = mock_env();
+    let err = contract.execute(deps.as_mut(), env, other_info, msg.clone()).unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    //minter can update minter
+    let minter_info = mock_info(MINTER, &[]);
+    let env = mock_env();
+    let res = contract.execute(deps.as_mut(), env, minter_info, msg);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn multi_sending_nft() {
+    let mut deps = mock_dependencies();
+    let contract = setup_contract(deps.as_mut());
+
+    // Mint a token
+    let token_id_1 = "melt1".to_string();
+    let token_id_2 = "melt2".to_string();
+    let token_uri = "https://www.merriam-webster.com/dictionary/melt".to_string();
+    let msg = to_binary("You now have the melting power").unwrap();
+
+    let mint_msg1 = ExecuteMsg::Mint(MintMsg::<Extension> {
+        token_id: token_id_1.clone(),
+        owner: String::from("venus"),
+        token_uri: Some(token_uri.clone()),
+        extension: None,
+    });
+    let mint_msg2 = ExecuteMsg::Mint(MintMsg::<Extension> {
+        token_id: token_id_2.clone(),
+        owner: String::from("venus"),
+        token_uri: Some(token_uri),
+        extension: None,
+    });
+
+    let minter = mock_info(MINTER, &[]);
+    contract
+        .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg1)
+        .unwrap();
+    contract
+        .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg2)
+        .unwrap();
+
+    let nft_info1 = SendNftsInfo {
+        token_id: token_id_1.clone(),
+        msg: msg.clone()
+    };
+    let nft_info2 = SendNftsInfo {
+        token_id: token_id_2.clone(),
+        msg: msg.clone()
+    };
+
+    let target = String::from("another_contract");
+    let send_msg = ExecuteMsg::MultiSendNft {
+        contract: target.clone(),
+        nft_info: vec![nft_info1, nft_info2],
+    };
+
+    let random = mock_info("random", &[]);
+    let err = contract
+        .execute(deps.as_mut(), mock_env(), random, send_msg.clone())
+        .unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    // but owner can
+    let random = mock_info("venus", &[]);
+    let res = contract
+        .execute(deps.as_mut(), mock_env(), random, send_msg);
+
+    assert!(res.is_ok());
+
+}
+
+#[test]
+fn multi_transferring_nft() {
+    let mut deps = mock_dependencies();
+    let contract = setup_contract(deps.as_mut());
+
+    // Mint a token
+    let token_id_1 = "melt1".to_string();
+    let token_id_2 = "melt2".to_string();
+    let token_uri = "https://www.merriam-webster.com/dictionary/melt".to_string();
+
+    let mint_msg1 = ExecuteMsg::Mint(MintMsg::<Extension> {
+        token_id: token_id_1.clone(),
+        owner: String::from("venus"),
+        token_uri: Some(token_uri.clone()),
+        extension: None,
+    });
+    let mint_msg2 = ExecuteMsg::Mint(MintMsg::<Extension> {
+        token_id: token_id_2.clone(),
+        owner: String::from("venus"),
+        token_uri: Some(token_uri.clone()),
+        extension: None,
+    });
+
+    let minter = mock_info(MINTER, &[]);
+    contract
+        .execute(deps.as_mut(), mock_env(), minter.clone(), mint_msg1)
+        .unwrap();
+    contract
+        .execute(deps.as_mut(), mock_env(), minter, mint_msg2)
+        .unwrap();
+
+    let nft_info1 = TransferNftsInfo {
+        recipient: "receiver1".to_string(),
+        token_id: token_id_1.clone(),
+    };
+    let nft_info2 = TransferNftsInfo {
+        recipient: "receiver2".to_string(),
+        token_id: token_id_2.clone(),
+    };
+    // random cannot transfer
+    let random = mock_info("random", &[]);
+    let transfer_msg = ExecuteMsg::MultiTransferNft {
+        nft_info: vec![nft_info1.clone(), nft_info2.clone()]
+    };
+
+    let err = contract
+        .execute(deps.as_mut(), mock_env(), random, transfer_msg)
+        .unwrap_err();
+    assert_eq!(err, ContractError::Unauthorized {});
+
+    // owner can
+    let random = mock_info("venus", &[]);
+    let transfer_msg = ExecuteMsg::MultiTransferNft {
+        nft_info: vec![nft_info1, nft_info2]
+    };
+
+    let res = contract
+        .execute(deps.as_mut(), mock_env(), random, transfer_msg);
+
+    assert!(res.is_ok());
+
 }
 
 #[test]

@@ -7,7 +7,7 @@ use cw2::set_contract_version;
 use cw721::{ContractInfoResponse, CustomMsg, Cw721Execute, Cw721ReceiveMsg, Expiration};
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, BurnTokenInfo, SendNftsInfo};
+use crate::msg::{ExecuteMsg, InstantiateMsg, MintMsg, SendNftsInfo, TransferNftsInfo};
 use crate::state::{Approval, Cw721Contract, TokenInfo};
 
 // Version info for migration
@@ -73,19 +73,21 @@ where
             ExecuteMsg::Burn { token_id } => self.burn(deps, env, info, token_id),
             ExecuteMsg::Extension { msg: _ } => Ok(Response::default()),
             ExecuteMsg::UpdateMinter { new_minter } => self.update_minter(deps, env, info, new_minter),
-            ExecuteMsg::BurnMint {
-                burn_token,
-                mint,
-            } => self.burn_mint(deps, env, info, burn_token, mint),
+            // ExecuteMsg::BurnMint {
+            //     burn_token,
+            //     mint,
+            // } => self.burn_mint(deps, env, info, burn_token, mint),
             ExecuteMsg::MultiSendNft { 
                 contract, 
                 nft_info
             } => self.multi_send_nft(deps, env, info, contract, nft_info),
+            ExecuteMsg::MultiTransferNft { 
+                nft_info 
+            } => self.multi_transfer_nft(deps, env, info, nft_info),
         }
     }
 }
 
-// TODO pull this into some sort of trait extension??
 impl<'a, T, C, E, Q> Cw721Contract<'a, T, C, E, Q>
 where
     T: Serialize + DeserializeOwned + Clone,
@@ -150,80 +152,6 @@ where
         .add_attribute("new_minter", new_minter))
     }
 
-    fn burn_mint(
-        &self,
-        deps: DepsMut,
-        _env: Env,
-        info: MessageInfo,
-        burn_token: BurnTokenInfo<T>,
-        mint: Option<MintMsg<T>>,
-    ) -> Result<Response<C>, ContractError> {
-
-        let minter = self.minter.load(deps.storage)?;
-        if info.sender != minter {
-            return Err(ContractError::Unauthorized {});
-        }
-
-        let token = self.tokens.load(deps.storage, &burn_token.burn_token_id)?;
-        let token_owner_addr = deps.api.addr_validate(&burn_token.burn_token_owner)?;
-        if token_owner_addr != token.owner {
-            return Err(ContractError::UnauthorizedOwner {});
-        }
-
-        self.tokens.remove(deps.storage, &burn_token.burn_token_id)?;
-        self.decrement_tokens(deps.storage)?;
-
-        //optional, if there is an nft to be changed
-        if let Some(changed_mint) = burn_token.changed_mint {
-            let changed_mint_owner = deps.api.addr_validate(&changed_mint.owner)?;
-            if token_owner_addr != changed_mint_owner {
-                return Err(ContractError::UnauthorizedOwner {});
-            }
-
-            let token = TokenInfo {
-                owner: changed_mint_owner,
-                approvals: vec![],
-                token_uri: changed_mint.token_uri,
-                extension: changed_mint.extension,
-            };
-            self.tokens
-                .update(deps.storage, &changed_mint.token_id, |old| match old {
-                    Some(_) => Err(ContractError::Claimed {}),
-                    None => Ok(token),
-                })?;
-    
-            self.increment_tokens(deps.storage)?;
-        }
-
-        //optional, the newly created nft
-        if let Some(new_mint) = mint {
-            let new_mint_owner = deps.api.addr_validate(&new_mint.owner)?;
-            if token_owner_addr != new_mint_owner {
-                return Err(ContractError::UnauthorizedOwner {});
-            }
-
-            let token = TokenInfo {
-                owner: new_mint_owner,
-                approvals: vec![],
-                token_uri: new_mint.token_uri,
-                extension: new_mint.extension,
-            };
-            self.tokens
-                .update(deps.storage, &new_mint.token_id, |old| match old {
-                    Some(_) => Err(ContractError::Claimed {}),
-                    None => Ok(token),
-                })?;
-
-            self.increment_tokens(deps.storage)?;
-        }
-
-        Ok(Response::new()
-        .add_attribute("action", "burn_mint")
-        .add_attribute("sender", info.sender)
-        .add_attribute("token_owner", token_owner_addr)
-        )
-    }
-
     fn multi_send_nft(
         &self,
         deps: DepsMut,
@@ -236,7 +164,7 @@ where
         let mut messages: Vec<CosmosMsg<C>> = vec![];
         for nft in nft_info {            
             let mut token = self.tokens.load(deps.storage, &nft.token_id)?;
-            self.check_can_send(deps.as_ref(), &env, &info, &token)?;
+            self.check_permission(deps.as_ref(), &env, &info, &token)?;
             token.owner = deps.api.addr_validate(&contract)?;
             token.approvals = vec![];
             self.tokens.save(deps.storage, &nft.token_id, &token)?;
@@ -253,10 +181,36 @@ where
         // Send message
         Ok(Response::new()
             .add_messages(messages)
-            .add_attribute("action", "multi_send_nfts")
+            .add_attribute("action", "multi_send_nft")
             .add_attribute("sender", info.sender)
             .add_attribute("recipient", contract)
             )
+
+    }
+
+    fn multi_transfer_nft(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        nft_info: Vec<TransferNftsInfo>,
+    ) -> Result<Response<C>, ContractError> {
+
+        for nft in nft_info {            
+            
+            let mut token = self.tokens.load(deps.storage, &nft.token_id)?;
+            // ensure we have permissions
+            self.check_permission(deps.as_ref(), &env, &info, &token)?;
+            // set owner and remove existing approvals
+            token.owner = deps.api.addr_validate(&nft.recipient)?;
+            token.approvals = vec![];
+            self.tokens.save(deps.storage, &nft.token_id, &token)?;
+        }
+
+        // Send message
+        Ok(Response::new()
+            .add_attribute("action", "multi_transfer_nft")
+            .add_attribute("sender", info.sender))
 
     }
 
@@ -400,7 +354,7 @@ where
         token_id: String,
     ) -> Result<Response<C>, ContractError> {
         let token = self.tokens.load(deps.storage, &token_id)?;
-        self.check_can_send(deps.as_ref(), &env, &info, &token)?;
+        self.check_permission(deps.as_ref(), &env, &info, &token)?;
 
         self.tokens.remove(deps.storage, &token_id)?;
         self.decrement_tokens(deps.storage)?;
@@ -430,7 +384,7 @@ where
     ) -> Result<TokenInfo<T>, ContractError> {
         let mut token = self.tokens.load(deps.storage, token_id)?;
         // ensure we have permissions
-        self.check_can_send(deps.as_ref(), env, info, &token)?;
+        self.check_permission(deps.as_ref(), env, info, &token)?;
         // set owner and remove existing approvals
         token.owner = deps.api.addr_validate(recipient)?;
         token.approvals = vec![];
@@ -446,8 +400,8 @@ where
         info: &MessageInfo,
         spender: &str,
         token_id: &str,
-        // if add == false, remove. if add == true, remove then set with this expiration
-        add: bool,
+        // if approving == false, remove. if approving == true, remove then set with this expiration
+        approving: bool,
         expires: Option<Expiration>,
     ) -> Result<TokenInfo<T>, ContractError> {
         let mut token = self.tokens.load(deps.storage, token_id)?;
@@ -456,14 +410,10 @@ where
 
         // update the approval list (remove any for the same spender before adding)
         let spender_addr = deps.api.addr_validate(spender)?;
-        token.approvals = token
-            .approvals
-            .into_iter()
-            .filter(|apr| apr.spender != spender_addr)
-            .collect();
+        token.approvals.retain(|apr| apr.spender != spender_addr);
 
         // only difference between approve and revoke
-        if add {
+        if approving {
             // reject expired data as invalid
             let expires = expires.unwrap_or_default();
             if expires.is_expired(&env.block) {
@@ -509,8 +459,8 @@ where
         }
     }
 
-    /// returns true iff the sender can transfer ownership of the token
-    pub fn check_can_send(
+    /// Returns true if the sender can transfer or burn token ownership.
+    pub fn check_permission(
         &self,
         deps: Deps,
         env: &Env,

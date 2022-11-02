@@ -9,6 +9,11 @@ Please feel free to modify `cw721-base` as you need to support these projects an
 and additional standards (like [cw-2981](https://github.com/CosmWasm/cw-plus/pull/414)) to meet
 the demands of the various NFT projects springing forth.
 
+## Changes
+
+Added some custom msgs to standard `cw721-base`
+
+
 ## Maintainers
 
 This repo is not maintained directly by Confio (although we can provide some code reviews and support),

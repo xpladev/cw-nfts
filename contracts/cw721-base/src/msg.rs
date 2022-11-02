@@ -61,18 +61,17 @@ pub enum ExecuteMsg<T, E> {
 
     /// nft minter update
     UpdateMinter { new_minter: String },
-
-    /// Upgrade or combine to create a new nft
-    BurnMint{
-        burn_token: BurnTokenInfo<T>,
-        mint: Option<MintMsg<T>>,
-    },
-
+    
     /// Multi Send Nfts
     MultiSendNft{
         contract: String,
         nft_info: Vec<SendNftsInfo>,
-    }
+    },
+
+    /// Multi Transfer Nfts
+    MultiTransferNft{
+        nft_info: Vec<TransferNftsInfo>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -174,14 +173,16 @@ pub struct MinterResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct BurnTokenInfo<T> {
-    pub burn_token_owner: String,
-    pub burn_token_id: String,
-    pub changed_mint: Option<MintMsg<T>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct SendNftsInfo {
     pub token_id: String,
     pub msg: Binary,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct TransferNftsInfo {
+    pub recipient: String,
+    pub token_id: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct MigrateMsg {}
