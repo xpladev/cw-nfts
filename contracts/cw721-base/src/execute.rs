@@ -73,10 +73,6 @@ where
             ExecuteMsg::Burn { token_id } => self.burn(deps, env, info, token_id),
             ExecuteMsg::Extension { msg: _ } => Ok(Response::default()),
             ExecuteMsg::UpdateMinter { new_minter } => self.update_minter(deps, env, info, new_minter),
-            // ExecuteMsg::BurnMint {
-            //     burn_token,
-            //     mint,
-            // } => self.burn_mint(deps, env, info, burn_token, mint),
             ExecuteMsg::MultiSendNft { 
                 contract, 
                 nft_info

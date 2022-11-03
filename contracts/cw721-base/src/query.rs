@@ -102,24 +102,23 @@ where
             return Ok(ApprovalResponse { approval });
         }
 
-        let filtered: Vec<_> = token
+        let filtered = token
             .approvals
             .into_iter()
             .filter(|t| t.spender == spender)
             .filter(|t| include_expired || !t.is_expired(&env.block))
-            .map(|a| cw721::Approval {
+            .find_map(|a| Some(cw721::Approval {
                 spender: a.spender.into_string(),
                 expires: a.expires,
-            })
-            .collect();
+            }));
 
-        if filtered.is_empty() {
+        if let Some(approval) = filtered {
+            return Ok(ApprovalResponse { approval });
+        }
+        else {
             return Err(StdError::not_found("Approval not found"));
         }
-        // we expect only one item
-        let approval = filtered[0].clone();
 
-        Ok(ApprovalResponse { approval })
     }
 
     /// approvals returns all approvals owner given access to
