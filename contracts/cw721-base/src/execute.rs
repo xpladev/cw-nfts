@@ -25,18 +25,27 @@ where
         &self,
         deps: DepsMut,
         _env: Env,
-        _info: MessageInfo,
+        info: MessageInfo,
         msg: InstantiateMsg,
     ) -> StdResult<Response<C>> {
         set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-        let info = ContractInfoResponse {
+        let contract_info = ContractInfoResponse {
             name: msg.name,
             symbol: msg.symbol,
         };
-        self.contract_info.save(deps.storage, &info)?;
+        self.contract_info.save(deps.storage, &contract_info)?;
         let minter = deps.api.addr_validate(&msg.minter)?;
         self.minter.save(deps.storage, &minter)?;
+
+        if let Some(sm) = msg.sub_minter {
+            let sub_minter = deps.api.addr_validate(&sm)?;
+            self.sub_minter.save(deps.storage, &sub_minter)?;
+        }
+        else {
+            self.sub_minter.save(deps.storage, &info.sender)?;
+        }
+
         Ok(Response::default())
     }
 
@@ -80,6 +89,7 @@ where
             ExecuteMsg::MultiTransferNft { 
                 nft_info 
             } => self.multi_transfer_nft(deps, env, info, nft_info),
+            ExecuteMsg::UpdateSubMinter { new_sub_minter } => self.update_sub_minter(deps, env, info, new_sub_minter),
         }
     }
 }
@@ -101,7 +111,10 @@ where
         let minter = self.minter.load(deps.storage)?;
 
         if info.sender != minter {
-            return Err(ContractError::Unauthorized {});
+            let sub_minter = self.sub_minter.load(deps.storage)?;
+            if info.sender != sub_minter {
+                return Err(ContractError::Unauthorized {});
+            }
         }
 
         // create the token
@@ -146,6 +159,28 @@ where
         .add_attribute("action", "update_minter")
         .add_attribute("sender", info.sender)
         .add_attribute("new_minter", new_minter))
+    }
+
+    fn update_sub_minter(
+        &self,
+        deps: DepsMut,
+        _env: Env,
+        info: MessageInfo,
+        new_sub_minter: String,
+    ) -> Result<Response<C>, ContractError> {
+
+        let sub_minter = self.sub_minter.load(deps.storage)?;
+        if info.sender != sub_minter {
+            return Err(ContractError::Unauthorized {});
+        }
+        
+        let new_sub_minter_addr = deps.api.addr_validate(&new_sub_minter)?;
+        self.sub_minter.save(deps.storage, &new_sub_minter_addr)?;
+
+        Ok(Response::new()
+        .add_attribute("action", "update_sub_minter")
+        .add_attribute("sender", info.sender)
+        .add_attribute("new_sub_minter", new_sub_minter))
     }
 
     fn multi_send_nft(

@@ -62,6 +62,7 @@ pub fn instantiate(
                 name: msg.name.clone(),
                 symbol: msg.symbol,
                 minter: env.contract.address.to_string(),
+                sub_minter: None,
             })?,
             funds: vec![],
             admin: None,
@@ -226,6 +227,7 @@ mod tests {
                         name: msg.name.clone(),
                         symbol: msg.symbol.clone(),
                         minter: MOCK_CONTRACT_ADDR.to_string(),
+                        sub_minter: None,
                     })
                     .unwrap(),
                     funds: vec![],

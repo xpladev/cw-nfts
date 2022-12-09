@@ -11,10 +11,12 @@ pub struct InstantiateMsg {
     /// Symbol of the NFT contract
     pub symbol: String,
 
-    /// The minter is the only one who can create new NFTs.
+    /// The minter and sub_minter is the only two who can create new NFTs.
     /// This is designed for a base NFT that is controlled by an external program
     /// or contract. You will likely replace this with custom logic in custom NFTs
     pub minter: String,
+
+    pub sub_minter: Option<String>,
 }
 
 /// This is like Cw721ExecuteMsg but we add a Mint command for an owner
@@ -61,6 +63,7 @@ pub enum ExecuteMsg<T, E> {
 
     /// nft minter update
     UpdateMinter { new_minter: String },
+    UpdateSubMinter { new_sub_minter: String },
     
     /// Multi Send Nfts
     MultiSendNft{

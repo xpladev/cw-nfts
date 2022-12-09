@@ -120,6 +120,7 @@ mod tests {
             name: "SpaceShips".to_string(),
             symbol: "SPACE".to_string(),
             minter: CREATOR.to_string(),
+            sub_minter: None,
         };
         entry::instantiate(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
 
@@ -152,6 +153,7 @@ mod tests {
             name: "SpaceShips".to_string(),
             symbol: "SPACE".to_string(),
             minter: CREATOR.to_string(),
+            sub_minter: None,
         };
         entry::instantiate(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
 
@@ -193,6 +195,7 @@ mod tests {
             name: "SpaceShips".to_string(),
             symbol: "SPACE".to_string(),
             minter: CREATOR.to_string(),
+            sub_minter: None,
         };
         entry::instantiate(deps.as_mut(), mock_env(), info.clone(), init_msg).unwrap();
 

@@ -21,6 +21,8 @@ where
     pub operators: Map<'a, (&'a Addr, &'a Addr), Expiration>,
     pub tokens: IndexedMap<'a, &'a str, TokenInfo<T>, TokenIndexes<'a, T>>,
 
+    pub sub_minter: Item<'a, Addr>,
+
     pub(crate) _custom_response: PhantomData<C>,
     pub(crate) _custom_query: PhantomData<Q>,
     pub(crate) _custom_execute: PhantomData<E>,
@@ -50,6 +52,7 @@ where
             "operators",
             "tokens",
             "tokens__owner",
+            "sub_minter",
         )
     }
 }
@@ -67,6 +70,7 @@ where
         operator_key: &'a str,
         tokens_key: &'a str,
         tokens_owner_key: &'a str,
+        minter_sub_key: &'a str,
     ) -> Self {
         let indexes = TokenIndexes {
             owner: MultiIndex::new(token_owner_idx, tokens_key, tokens_owner_key),
@@ -77,6 +81,7 @@ where
             token_count: Item::new(token_count_key),
             operators: Map::new(operator_key),
             tokens: IndexedMap::new(tokens_key, indexes),
+            sub_minter: Item::new(minter_sub_key),
             _custom_response: PhantomData,
             _custom_execute: PhantomData,
             _custom_query: PhantomData,
